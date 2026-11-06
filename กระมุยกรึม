@@ -1,0 +1,194 @@
+
+-- MAHANAKHON AUTO HUB
+-- Delivery GPS Assistant
+-- Navigation only: no teleport / no remote calls
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local Player = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local Old = Player.PlayerGui:FindFirstChild("MahanakhonAutoHub")
+if Old then Old:Destroy() end
+
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "MahanakhonAutoHub"
+Gui.ResetOnSpawn = false
+Gui.Parent = Player.PlayerGui
+
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 270, 0, 280)
+Main.Position = UDim2.new(0.5, -135, 0.4, 0)
+Main.BackgroundColor3 = Color3.fromRGB(25, 28, 36)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = Gui
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 12)
+Corner.Parent = Main
+
+local function Label(parent, text, pos, size, color)
+    local L = Instance.new("TextLabel")
+    L.Size = size
+    L.Position = pos
+    L.BackgroundTransparency = 1
+    L.Text = text
+    L.TextColor3 = color or Color3.new(1,1,1)
+    L.TextSize = 14
+    L.Font = Enum.Font.GothamSemibold
+    L.Parent = parent
+    return L
+end
+
+Label(Main, "MAHANAKHON AUTO HUB",
+    UDim2.new(0,10,0,8),
+    UDim2.new(1,-50,0,30),
+    Color3.fromRGB(255,190,65))
+
+local Hide = Instance.new("TextButton")
+Hide.Size = UDim2.new(0,30,0,28)
+Hide.Position = UDim2.new(1,-38,0,7)
+Hide.Text = "-"
+Hide.TextSize = 20
+Hide.Parent = Main
+
+local Status = Label(Main, "GPS: WAITING",
+    UDim2.new(0,12,0,43),
+    UDim2.new(1,-24,0,25),
+    Color3.fromRGB(100,220,140))
+
+local function MakeInput(title, y, placeholder)
+    Label(Main,title,UDim2.new(0,12,0,y),
+        UDim2.new(1,-24,0,20),
+        Color3.fromRGB(190,195,205))
+
+    local Box = Instance.new("TextBox")
+    Box.Size = UDim2.new(1,-24,0,32)
+    Box.Position = UDim2.new(0,12,0,y+22)
+    Box.BackgroundColor3 = Color3.fromRGB(43,48,60)
+    Box.TextColor3 = Color3.new(1,1,1)
+    Box.PlaceholderText = placeholder
+    Box.PlaceholderColor3 = Color3.fromRGB(150,150,150)
+    Box.Text = ""
+    Box.TextSize = 14
+    Box.Font = Enum.Font.Gotham
+    Box.ClearTextOnFocus = false
+    Box.Parent = Main
+
+    Instance.new("UICorner",Box).CornerRadius =
+        UDim.new(0,7)
+
+    return Box
+end
+
+local XBox = MakeInput("DESTINATION X",75,"Enter X coordinate")
+local ZBox = MakeInput("DESTINATION Z",132,"Enter Z coordinate")
+
+local Distance = Label(Main,"DISTANCE: --",
+    UDim2.new(0,12,0,195),
+    UDim2.new(1,-24,0,25))
+
+local Direction = Label(Main,"DIRECTION: --",
+    UDim2.new(0,12,0,225),
+    UDim2.new(1,-24,0,25))
+
+local SetButton = Instance.new("TextButton")
+SetButton.Size = UDim2.new(1,-24,0,32)
+SetButton.Position = UDim2.new(0,12,0,250)
+SetButton.BackgroundColor3 = Color3.fromRGB(220,155,45)
+SetButton.TextColor3 = Color3.new(1,1,1)
+SetButton.Text = "SET GPS TARGET"
+SetButton.TextSize = 13
+SetButton.Font = Enum.Font.GothamBold
+SetButton.Parent = Main
+
+Instance.new("UICorner",SetButton).CornerRadius =
+    UDim.new(0,7)
+
+local Target = nil
+
+SetButton.MouseButton1Click:Connect(function()
+    local x = tonumber(XBox.Text)
+    local z = tonumber(ZBox.Text)
+
+    if x and z then
+        Target = Vector3.new(x,0,z)
+        Status.Text = "GPS: TARGET SET"
+        Status.TextColor3 = Color3.fromRGB(100,220,140)
+    else
+        Status.Text = "GPS: INVALID COORDINATES"
+        Status.TextColor3 = Color3.fromRGB(255,100,100)
+    end
+end)
+
+Hide.MouseButton1Click:Connect(function()
+    Main.Visible = false
+
+    local Open = Instance.new("TextButton")
+    Open.Size = UDim2.new(0,100,0,38)
+    Open.Position = UDim2.new(0,10,0.5,0)
+    Open.Text = "OPEN GPS"
+    Open.Parent = Gui
+
+    Instance.new("UICorner",Open).CornerRadius =
+        UDim.new(0,8)
+
+    Open.MouseButton1Click:Connect(function()
+        Main.Visible = true
+        Open:Destroy()
+    end)
+end)
+
+local Connection
+Connection = RunService.RenderStepped:Connect(function()
+    if not Gui.Parent then
+        Connection:Disconnect()
+        return
+    end
+
+    if not Target then return end
+
+    local Character = Player.Character
+    local Root = Character and
+        Character:FindFirstChild("HumanoidRootPart")
+
+    if not Root then return end
+
+    local Delta = Vector3.new(
+        Target.X - Root.Position.X,
+        0,
+        Target.Z - Root.Position.Z
+    )
+
+    local Dist = Delta.Magnitude
+
+    Distance.Text = string.format(
+        "DISTANCE: %.1f STUDS",Dist)
+
+    if Dist < 8 then
+        Direction.Text = "NEAR DESTINATION"
+    else
+        local Cam = workspace.CurrentCamera
+        local LocalDir = Cam.CFrame:VectorToObjectSpace(
+            Delta.Unit
+        )
+
+        local Side = LocalDir.X
+        local Front = -LocalDir.Z
+
+        local D = ""
+
+        if math.abs(Front) > math.abs(Side) then
+            D = Front > 0 and "FORWARD" or "BACK"
+        else
+            D = Side > 0 and "RIGHT" or "LEFT"
+        end
+
+        Direction.Text = "DIRECTION: "..D
+    end
+end)
+
+print("MAHANAKHON AUTO HUB GPS LOADED")
